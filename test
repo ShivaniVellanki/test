@@ -1,5 +1,1519 @@
-(function () {
+quill_include.js - 
+(function () 
+{
     var inside = document.createElement('script'); inside.type = 'text/javascript'; inside.async = true;
     inside.src = ('https:' == document.location.protocol ? 'https://' : 'http://') + 'stp2-tracker.inside-graph.com/gtm/IN-1000545/inside.js';
     var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(inside, s);
+})();
+
+
+
+quill_inside.js - 
+
+// Quill
+var _inside = _inside || [];
+// var _inside = [];
+var _insideLoaded = _insideLoaded || false;
+
+(function () {
+	if (_insideLoaded)
+		return;
+	_insideLoaded = true;
+
+	var accountKey = "IN-1000545";
+	var trackerURL = "stp2-tracker.inside-graph.com";
+	var subsiteId = "2";
+	var useCustomFunctionForCheckout = true;
+	var maxLoop = maxLoop || 20;
+	var curLoop = curLoop || 0;
+	var insideOrderTotal = 0;
+	var firstCall = false;
+
+	var detectSearchByUrl = true;
+	var searchUrl = null;
+	var searchClassName = null;
+	var detectProductCategoryByUrl = true;
+	var productCategoryUrl = null;
+	var productCategoryClassName = null;
+	var detectProductByUrl = true;
+	var productUrl = null;
+	var productClassName = null;
+	var detectCheckoutByUrl = true;
+	var checkoutUrl = null;
+	var checkoutClassName = null;
+	var detectOrderConfirmedByUrl = true;
+	var orderConfirmedUrl = "/OrderSubmitted";
+	var orderConfirmedClassName = null;
+
+	try {
+		if (window.location.host.toLowerCase().indexOf("ho.quill.com") != -1 || window.location.host.toLowerCase().indexOf("homeoffice.quill.com") != -1) {
+			subsiteId = "1";
+		}
+	} catch (subsiteex) { }
+
+	// Utility Functions
+	function log() {
+		if (typeof (console) != "undefined" && typeof (console.log) != "undefined") {
+			//console.log("[INSIDE]", Array.prototype.slice.call(arguments));
+		}
+	}
+
+	function deferWait(callback, test) {
+		if (test()) {
+			callback();
+			return;
+		}
+		var _interval = 10;
+		var _spin = function () {
+			if (test()) {
+				callback();
+			}
+			else {
+				_interval = _interval >= 1000 ? 1000 : _interval * 2;
+				setTimeout(_spin, _interval);
+			}
+		};
+		setTimeout(_spin, _interval);
+	}
+
+	function keepWait(callback, test) {
+		if (test()) {
+			callback();
+			if (curLoop >= maxLoop) {
+				return;
+			}
+		}
+		var _interval = 1000;
+		var _spin = function () {
+			if (test()) {
+				curLoop = curLoop + 1;
+				callback();
+				if (curLoop >= maxLoop) {
+					return;
+				}
+			}
+			setTimeout(_spin, _interval);
+		};
+		setTimeout(_spin, _interval);
+	}
+
+	var indexOf = [].indexOf || function (prop) {
+		for (var i = 0; i < this.length; i++) {
+			if (this[i] === prop)
+				return i;
+		}
+		return -1;
+	};
+
+	var getElementsByClassNameManual = function (className, context) {
+		if (context.getElementsByClassName)
+			return context.getElementsByClassName(className);
+		var elems = document.querySelectorAll ? context.querySelectorAll("." + className) : (function () {
+			var all = context.getElementsByTagName("*"), elements = [], i = 0;
+			for (; i < all.length; i++) {
+				if (all[i].className && (" " + all[i].className + " ").indexOf(" " + className + " ") > -1 && indexOf.call(elements, all[i]) === -1)
+					elements.push(all[i]);
+			}
+			return elements;
+		})();
+		return elems;
+	};
+
+	function myTrim(text) {
+		if (typeof (text) != "undefined" && text != null)
+			return typeof (text.trim) === "function" ? text.trim() : text.replace(/^\s+|\s+$/gm, '');
+
+		return null;
+	}
+
+	function isNumber(o) {
+		try {
+			return !isNaN(o - 0) && o !== null && o !== "" && o !== false;
+		}
+		catch (tempex) { }
+
+		return false;
+	}
+
+	function setCookie(cname, cvalue, exdays) {
+		var d = new Date();
+		d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
+		var expires = "expires=" + d.toGMTString();
+		document.cookie = cname + "=" + cvalue + "; " + expires + ";path=/";
+	}
+
+	function getCookie(cname) {
+		var name = cname + "=";
+		var ca = document.cookie.split(';');
+		for (var i = 0; i < ca.length; i++) {
+			var c = myTrim(ca[i]);
+			if (c.indexOf(name) == 0)
+				return c.substring(name.length, c.length);
+		}
+		return null;
+	}
+
+	function deleteCookie(cname) {
+		document.cookie = cname + "=" + 0 + "; " + "expires=01 Jan 1970 00:00:00 GMT" + ";path=/";
+	}
+
+	function roundToTwo(num) {
+		if (Math != "undefined" && Math.round != "undefined")
+			return +(Math.round(num + "e+2") + "e-2");
+		else
+			return num;
+	}
+
+	function getSearchParameters() {
+		var prmstr = window.location.search.substr(1);
+		return prmstr != null && prmstr != "" ? transformToAssocArray(prmstr) : [];
+	}
+
+	function transformToAssocArray(prmstr) {
+		var params = [];
+		var prmarr = prmstr.split("&");
+		for (var i = 0; i < prmarr.length; i++) {
+			params[i] = prmarr[i];
+		}
+
+		return params;
+	}
+	// End of utility functions
+
+	function getViewData() {
+		try {
+
+			// Output view data
+			// Default view data is "unknown"
+
+			var data = {};
+
+			data.action = "trackView";
+			data.tags = "host:" + window.location.host;
+			data.type = "other";
+			data.url = window.location.href;
+			data.name = "Unknown Page: " + window.location.href;
+
+			var temp_loc = window.location.href.split("://")[1].split("/");
+			var page = "";
+
+			var add_tags = "";
+			var params = getSearchParameters();
+			var searchterm = "Search"; // Find the searchterm the visitor
+			// entered for the search page to be
+			// used as the page name
+			if (params != null && params.length > 0) {
+				for (var i = 0; i < params.length; i++) {
+					add_tags = add_tags + "," + params[i];
+					if (params[i].indexOf("keywords=") == 0) {
+						searchterm = params[i].split("keywords=")[1];
+					}
+				}
+			}
+
+			for (var i = 1; i < temp_loc.length; i++) {
+				if (temp_loc[i] != null && temp_loc[i].length > 0)
+					page = temp_loc[i];
+			}
+			var curpage = page.split("?")[0];
+
+			// Identify and assign the correct page type here
+			// The part below is actually very flexible, can use dataLayer too
+			// sometimes, etc so if needed can also just delete the global
+			// variable parts and make your own algorithm. From my experience
+			// the following part will rarely work for all websites.
+
+			var temppagetype = "other";
+			if (typeof (Analytics) != "undefined" && Analytics != null && typeof (Analytics.traffic) != "undefined" && Analytics.traffic != null
+				&& typeof (Analytics.traffic.pagename) != "undefined" && Analytics.traffic.pagename != null) {
+				temppagetype = Analytics.traffic.pagename;
+			}
+
+			if ((curpage == "" || curpage == "/" || curpage == "index.html") && temp_loc.length < 3) {
+				data.type = "homepage";
+			}
+			else if (temppagetype == "home") {
+				data.type = "homepage";
+			}
+			else if (temppagetype == "login") {
+				data.type = "login";
+			}
+			else if (temppagetype == "searchresults") {
+				data.type = "search";
+			}
+			else if (temppagetype == "browse" || temppagetype == "inkandtonerhome") {
+				data.type = "productcategory";
+			}
+			else if (temppagetype == "sku") {
+				data.type = "product";
+			}
+			else if (temppagetype == "cart") {
+				data.type = "checkout";
+			}
+			else if (temppagetype.indexOf("checkout") != -1) {
+				data.type = "checkout";
+			}
+
+			if (detectSearchByUrl && searchUrl != null) {
+				if (data.url.indexOf(searchUrl) != -1) {
+					data.type = "search";
+				}
+			}
+			else if (searchClassName != null) {
+				var tempelem = getElementsByClassNameManual(searchClassName, document);
+				if (tempelem != null && tempelem.length > 0) {
+					data.type = "search";
+				}
+			}
+
+			if (detectProductCategoryByUrl && productCategoryUrl != null) {
+				if (data.url.indexOf(productCategoryUrl) != -1) {
+					data.type = "productcategory";
+				}
+			}
+			else if (productCategoryClassName != null) {
+				var tempelem = getElementsByClassNameManual(productCategoryClassName, document);
+				if (tempelem != null && tempelem.length > 0) {
+					data.type = "productcategory";
+				}
+			}
+
+			if (detectProductByUrl && productUrl != null) {
+				if (data.url.indexOf(productUrl) != -1) {
+					data.type = "product";
+				}
+			}
+			else if (productClassName != null) {
+				var tempelem = getElementsByClassNameManual(productClassName, document);
+				if (tempelem != null && tempelem.length > 0) {
+					data.type = "product";
+				}
+			}
+
+			if (detectCheckoutByUrl) {
+				if (data.url.indexOf(checkoutUrl) != -1) {
+					data.type = "checkout";
+				}
+			}
+			else if (checkoutClassName != null) {
+				var tempelem = getElementsByClassNameManual(checkoutClassName, document);
+				if (tempelem != null && tempelem.length > 0) {
+					data.type = "checkout";
+				}
+			}
+
+			if (detectOrderConfirmedByUrl && orderConfirmedUrl) {
+				if (data.url.indexOf(orderConfirmedUrl) != -1) {
+					data.type = "orderconfirmed";
+				}
+			}
+			else if (orderConfirmedClassName != null) {
+				var tempelem = getElementsByClassNameManual(orderConfirmedClassName, document);
+				if (tempelem != null && tempelem.length > 0) {
+					data.type = "orderconfirmed";
+				}
+			}
+
+			// Finish identying
+
+			switch (data.type) {
+				case "homepage":
+					data.name = "Home";
+					break;
+				case "search":
+					data.name = searchterm;
+					break;
+				case "login":
+					var tempPageName = getPageName();
+					if (tempPageName != null && tempPageName.length > 0)
+						data.name = tempPageName;
+					break;
+				case "productcategory":
+					var tempcat = getCategory();
+					if (tempcat != null && tempcat.length > 0) {
+						if (tempcat.length > 149)
+							tempcat = tempcat.substring(0, 149);
+						data.category = tempcat;
+					}
+
+					var tempPageName = getPageName();
+					if (tempPageName != null && tempPageName.length > 0)
+						data.name = tempPageName;
+
+					var tempcatdata = getCategoryData();
+					if (tempcatdata != null)
+						data.data = tempcatdata;
+
+					break;
+				case "product":
+					var tempPageName = getPageName();
+					if (tempPageName != null && tempPageName.length > 0)
+						data.name = tempPageName;
+
+					var tempcat = getCategory();
+					if (tempcat != null && tempcat.length > 0) {
+						if (tempcat.length > 149)
+							tempcat = tempcat.substring(0, 149);
+						data.category = tempcat;
+					}
+
+					var tempval = getProductName();
+					if (tempval != null && tempval.length > 0)
+						data.name = tempval;
+
+					var tempval = getProductImage();
+					if (tempval != null && tempval.length > 0)
+						data.img = tempval;
+
+					var tempsku = getProductSku();
+					if (tempsku != null && tempsku.length > 0) {
+						data.sku = tempsku;
+						data.name = tempsku + " / " + data.name;
+					}
+
+					var tempprice = getProductPrice();
+					if (tempprice != null && tempprice > 0)
+						data.price = tempprice;
+
+					var tempcatdata = getCategoryData();
+					if (tempcatdata != null)
+						data.data = tempcatdata;
+					break;
+				case "checkout":
+					var tempPageName = getPageName();
+					if (tempPageName != null && tempPageName.length > 0)
+						data.name = tempPageName;
+					break;
+				case "orderconfirmed":
+					data.name = "Order Confirmed";
+					break;
+				case "other":
+					var tempPageName = getPageName();
+					if (tempPageName != null && tempPageName.length > 0)
+						data.name = tempPageName;
+					break;
+			}
+
+			// Get view data from page
+
+			return data;
+		}
+		catch (ex) {
+			if (typeof (console) != "undefined" && typeof (console.log) != "undefined")
+				log("getViewData error: ", ex);
+			return null;
+		}
+	}
+
+	function getPageName() {
+		// Modify if necessary
+		var content = document.getElementsByTagName("title");
+		if (typeof (content) != "undefined" && content != null && content.length > 0) {
+			var result = content[0].textContent || content[0].innerText;
+			if (typeof (result) != "undefined" && result != null && result.length > 0) {
+				if (result.indexOf("| Quill.com") != -1) {
+					result = result.split("| Quill.com")[0];
+				}
+				return myTrim(result);
+			}
+		}
+
+		return null;
+	}
+
+	function getProductName() {
+		try {
+			if (typeof (jQuery) != "undefined" && jQuery) {
+				var ldjsons = jQuery('script[type="application/ld+json"]');
+				for (var i = 0; i < ldjsons.length; i++) {
+					var tempdata = JSON.parse(jQuery(ldjsons[i]).last().html().replace(/\n/g, ""));
+					if (typeof (tempdata) != "undefined" && tempdata != null && jQuery.isArray(tempdata)) {
+						for (var l = 0; l < tempdata.length; l++) {
+							var tempdetail = tempdata[i];
+							if (typeof (tempdetail) != "undefined" && tempdetail != null && typeof (tempdetail["@type"]) != "undefined" && tempdetail["@type"] != null && tempdetail["@type"] == "Product" && typeof (tempdetail.name) != "undefined" && tempdetail.name != null && tempdetail.name.length > 0) {
+								if (jQuery.isArray(tempdetail.name)) {
+									return tempdetail.name[0];
+								}
+								else
+									return tempdetail.name;
+							}
+						}
+					}
+					else if (typeof (tempdata) != "undefined" && tempdata != null && typeof (tempdata["@type"]) != "undefined" && tempdata["@type"] != null && tempdata["@type"] == "Product" && typeof (tempdata.name) != "undefined" && tempdata.name != null && tempdata.name.length > 0) {
+						if (jQuery.isArray(tempdata.name)) {
+							return tempdata.name[0];
+						}
+						else
+							return tempdata.name;
+					}
+				}
+			}
+		}
+		catch (tempex) {
+		}
+
+		return null;
+	}
+
+	function getProductImage() {
+		try {
+			if (typeof (jQuery) != "undefined" && jQuery) {
+				var ldjsons = jQuery('script[type="application/ld+json"]');
+				for (var i = 0; i < ldjsons.length; i++) {
+					var tempdata = JSON.parse(jQuery(ldjsons[i]).last().html().replace(/\n/g, ""));
+					if (typeof (tempdata) != "undefined" && tempdata != null && jQuery.isArray(tempdata)) {
+						for (var l = 0; l < tempdata.length; l++) {
+							var tempdetail = tempdata[i];
+							if (typeof (tempdetail) != "undefined" && tempdetail != null && typeof (tempdetail["@type"]) != "undefined" && tempdetail["@type"] != null && tempdetail["@type"] == "Product" && typeof (tempdetail.image) != "undefined" && tempdetail.image != null && tempdetail.image.length > 0) {
+								if (jQuery.isArray(tempdetail.image)) {
+									return tempdetail.image[0];
+								}
+								else
+									return tempdetail.image;
+							}
+						}
+					}
+					else if (typeof (tempdata) != "undefined" && tempdata != null && typeof (tempdata["@type"]) != "undefined" && tempdata["@type"] != null && tempdata["@type"] == "Product" && typeof (tempdata.image) != "undefined" && tempdata.image != null && tempdata.image.length > 0) {
+						if (jQuery.isArray(tempdata.image)) {
+							return tempdata.image[0];
+						}
+						else
+							return tempdata.image;
+					}
+				}
+			}
+		}
+		catch (tempex) {
+		}
+
+		try {
+			var tempcontent = document.getElementById("SkuPageMainImg");
+			if (tempcontent != null) {
+				return tempcontent.getAttribute("src");
+			}
+		}
+		catch (tempex) {
+		}
+
+		return null;
+	}
+
+	function getProductPrice() {
+		try {
+			var tempcontent = document.getElementById("SkuPriceLabel");
+			if (tempcontent != null) {
+				var temptext = tempcontent.innerText || tempcontent.textContent;
+				return parseFloat(temptext.replace(/[^0-9\.\-\+]/g, ""));
+			}
+		}
+		catch (tempex) {
+		}
+
+		try {
+			var tempcontent = document.getElementById("skuPriceLabel");
+			if (tempcontent != null) {
+				var temptext = tempcontent.innerText || tempcontent.textContent;
+				return parseFloat(temptext.replace(/[^0-9\.\-\+]/g, ""));
+			}
+		}
+		catch (tempex) {
+		}
+
+		return null;
+	}
+
+	function getProductSku() {
+		try {
+			var tempcontent = document.getElementById("SkuPageMainImg");
+			if (tempcontent != null) {
+				return tempcontent.getAttribute("data-sku");
+			}
+		}
+		catch (tempex) {
+		}
+
+		try {
+			if (typeof (jQuery) != "undefined" && jQuery) {
+				var ldjsons = jQuery('script[type="application/ld+json"]');
+				for (var i = 0; i < ldjsons.length; i++) {
+					var tempdata = JSON.parse(jQuery(ldjsons[i]).last().html().replace(/\n/g, ""));
+					if (typeof (tempdata) != "undefined" && tempdata != null && jQuery.isArray(tempdata)) {
+						for (var l = 0; l < tempdata.length; l++) {
+							var tempdetail = tempdata[i];
+							if (typeof (tempdetail) != "undefined" && tempdetail != null && typeof (tempdetail["@type"]) != "undefined" && tempdetail["@type"] != null && tempdetail["@type"] == "Product" && typeof (tempdetail.sku) != "undefined" && tempdetail.sku != null && tempdetail.sku.length > 0) {
+								if (jQuery.isArray(tempdetail.sku)) {
+									return tempdetail.sku[0];
+								}
+								else
+									return tempdetail.sku;
+							}
+						}
+					}
+					else if (typeof (tempdata) != "undefined" && tempdata != null && typeof (tempdata["@type"]) != "undefined" && tempdata["@type"] != null && tempdata["@type"] == "Product" && typeof (tempdata.sku) != "undefined" && tempdata.sku != null && tempdata.sku.length > 0) {
+						if (jQuery.isArray(tempdata.sku)) {
+							return tempdata.sku[0];
+						}
+						else
+							return tempdata.sku;
+					}
+				}
+			}
+		}
+		catch (tempex) {
+		}
+
+		return null;
+	}
+
+	function getCategory() {
+		try {
+			var breadcrumbs = document.getElementById("skuBreadCrumbs");
+
+			if (breadcrumbs != null) {
+				breadcrumbs = breadcrumbs.getElementsByTagName("a");
+				if (breadcrumbs != null && breadcrumbs.length > 0) {
+					var path = "";
+					for (var i = 0; i < breadcrumbs.length; i++) {
+						var temp = breadcrumbs[i].innerText || breadcrumbs[i].textContent;
+						var tempelem = breadcrumbs[i].getElementsByTagName("span");
+						if (tempelem != null && tempelem.length > 0) {
+							temp = tempelem[0].innerText || tempelem[0].textContent;
+						}
+						temp = myTrim(temp);
+						path += (path != "" ? " / " : "") + temp;
+					}
+					if (path != "")
+						return path;
+				}
+
+			}
+		}
+		catch (temptex) {
+		}
+
+		return null;
+	}
+
+	function getCategoryData() {
+		try {
+			var tempdata = {};
+			var datafound = false;
+
+			if (typeof (Analytics) != "undefined" && Analytics != null && typeof (Analytics.tracking) != "undefined" && Analytics.tracking != null
+				&& typeof (Analytics.tracking.items) != "undefined" && Analytics.tracking.items != null) {
+				for (var key in Analytics.tracking.items) {
+					if (!Analytics.tracking.items.hasOwnProperty(key))
+						continue;
+
+					var obj = Analytics.tracking.items[key];
+					if (key.indexOf("mainproduct_") == 0) {
+						datafound = true;
+						if (typeof (obj.producthierarchy) != "undefined" && obj.producthierarchy != null) {
+							if (typeof (obj.producthierarchy.sc) != "undefined" && obj.producthierarchy.sc != null
+								&& typeof (obj.producthierarchy.sc.value) != "undefined" && obj.producthierarchy.sc.value != null) {
+								tempdata["L1"] = obj.producthierarchy.sc.value;
+							}
+							if (typeof (obj.producthierarchy.cg) != "undefined" && obj.producthierarchy.cg != null
+								&& typeof (obj.producthierarchy.cg.value) != "undefined" && obj.producthierarchy.cg.value != null) {
+								tempdata["L2"] = obj.producthierarchy.cg.value;
+							}
+							if (typeof (obj.producthierarchy.dp) != "undefined" && obj.producthierarchy.dp != null
+								&& typeof (obj.producthierarchy.dp.value) != "undefined" && obj.producthierarchy.dp.value != null) {
+								tempdata["L3"] = obj.producthierarchy.dp.value;
+							}
+							if (typeof (obj.producthierarchy.cl) != "undefined" && obj.producthierarchy.cl != null
+								&& typeof (obj.producthierarchy.cl.value) != "undefined" && obj.producthierarchy.cl.value != null) {
+								tempdata["L4"] = obj.producthierarchy.cl.value;
+							}
+							if (typeof (obj.producthierarchy.ss) != "undefined" && obj.producthierarchy.ss != null
+								&& typeof (obj.producthierarchy.ss.value) != "undefined" && obj.producthierarchy.ss.value != null) {
+								tempdata["L5"] = obj.producthierarchy.ss.value;
+							}
+						}
+					}
+				}
+			}
+			if (datafound)
+				return tempdata;
+
+			if (typeof (Analytics) != "undefined" && Analytics != null && typeof (Analytics.tracking) != "undefined" && Analytics.tracking != null
+				&& typeof (Analytics.tracking.browse) != "undefined" && Analytics.tracking.browse != null
+				&& typeof (Analytics.tracking.browse.producthierarchy) != "undefined" && Analytics.tracking.browse.producthierarchy != null) {
+				datafound = true;
+				var obj = Analytics.tracking.browse;
+
+				if (typeof (obj.producthierarchy.sc) != "undefined" && obj.producthierarchy.sc != null
+					&& typeof (obj.producthierarchy.sc.value) != "undefined" && obj.producthierarchy.sc.value != null) {
+					tempdata["L1"] = obj.producthierarchy.sc.value;
+				}
+				if (typeof (obj.producthierarchy.cg) != "undefined" && obj.producthierarchy.cg != null
+					&& typeof (obj.producthierarchy.cg.value) != "undefined" && obj.producthierarchy.cg.value != null) {
+					tempdata["L2"] = obj.producthierarchy.cg.value;
+				}
+				if (typeof (obj.producthierarchy.dp) != "undefined" && obj.producthierarchy.dp != null
+					&& typeof (obj.producthierarchy.dp.value) != "undefined" && obj.producthierarchy.dp.value != null) {
+					tempdata["L3"] = obj.producthierarchy.dp.value;
+				}
+				if (typeof (obj.producthierarchy.cl) != "undefined" && obj.producthierarchy.cl != null
+					&& typeof (obj.producthierarchy.cl.value) != "undefined" && obj.producthierarchy.cl.value != null) {
+					tempdata["L4"] = obj.producthierarchy.cl.value;
+				}
+				if (typeof (obj.producthierarchy.ss) != "undefined" && obj.producthierarchy.ss != null
+					&& typeof (obj.producthierarchy.ss.value) != "undefined" && obj.producthierarchy.ss.value != null) {
+					tempdata["L5"] = obj.producthierarchy.ss.value;
+				}
+			}
+			if (datafound)
+				return tempdata;
+
+		}
+		catch (temptex) {
+		}
+
+		return null;
+	}
+
+	function getOrderData() {
+		try {
+			var data = [];
+
+			var totalprice = 0;
+			var orderID = "auto";
+
+			if (typeof (Analytics) != "undefined" && Analytics != null && typeof (Analytics.global) != "undefined" && Analytics.global != null
+				&& typeof (Analytics.global.cart) != "undefined" && Analytics.global.cart != null) {
+				var details = [];
+				var temprows = [];
+				if (typeof (Analytics.global.cart.lines) != "undefined" && Analytics.global.cart.lines != null) {
+					details = Analytics.global.cart.lines;
+				}
+
+				for (var key in Analytics.tracking.items) {
+					if (!Analytics.tracking.items.hasOwnProperty(key))
+						continue;
+
+					var obj = Analytics.tracking.items[key];
+					if (key.indexOf("minicartitems_") == 0) {
+						temprows.push(obj);
+					}
+				}
+
+				for (var i = 0; i < details.length; i++) {
+					var detail = details[i];
+					var temprow = null;
+					for (var l = 0; l < temprows.length; l++) {
+						var tempsku = temprows[l].s;
+						if (tempsku == detail.sku) {
+							temprow = temprows[l];
+							break;
+						}
+					}
+
+					if (temprow) {
+						var item_name = temprow.name;
+						var img_link = temprow.imageurl;
+
+						var qty = detail.qty;
+						var price = detail.total / qty;
+						totalprice = totalprice + detail.total;
+						var item_sku = detail.sku;
+
+						data.push({
+							"action": "addItem",
+							"orderId": orderID,
+							"name": myTrim(item_name),
+							"price": price,
+							"sku": myTrim(item_sku),
+							"img": img_link,
+							"qty": qty
+						});
+					}
+				}
+
+				if (data.length > 0) {
+					var tempdata = {};
+
+					try {
+						if (typeof (Analytics.global.cart.Total) != "undefined" && Analytics.global.cart.Total != null
+							&& Analytics.global.cart.Total > 0) {
+							totalprice = Analytics.global.cart.Total;
+						}
+
+						if (typeof (Analytics.global.cart.ShippingTotal) != "undefined" && Analytics.global.cart.ShippingTotal != null
+							&& Analytics.global.cart.ShippingTotal > 0) {
+							tempdata.shipping = Analytics.global.cart.ShippingTotal;
+						}
+
+						if (typeof (Analytics.global.cart.Tax) != "undefined" && Analytics.global.cart.Tax != null && Analytics.global.cart.Tax > 0) {
+							tempdata.tax = Analytics.global.cart.Tax;
+						}
+
+						if (typeof (Analytics.global.cart.total) != "undefined" && Analytics.global.cart.total != null
+							&& Analytics.global.cart.total > 0) {
+							totalprice = Analytics.global.cart.total;
+						}
+
+						if (typeof (Analytics.global.cart.shippingTotal) != "undefined" && Analytics.global.cart.shippingTotal != null
+							&& Analytics.global.cart.shippingTotal > 0) {
+							tempdata.shipping = Analytics.global.cart.shippingTotal;
+						}
+
+						if (typeof (Analytics.global.cart.tax) != "undefined" && Analytics.global.cart.tax != null && Analytics.global.cart.tax > 0) {
+							tempdata.tax = Analytics.global.cart.tax;
+						}
+
+					}
+					catch (totalex) {
+					}
+
+					data.push({
+						"action": "trackOrder",
+						"orderId": orderID,
+						"orderTotal": totalprice,
+						"data": tempdata
+					});
+				}
+
+				return data;
+			}
+		}
+		catch (ex) {
+			log("getOrderData error. ", ex);
+		}
+
+		return null;
+	}
+
+	function getOrderDataOld() {
+		try {
+			var data = [];
+
+			var totalprice = 0;
+			var orderID = "auto";
+
+			if (typeof (Analytics) != "undefined" && Analytics != null && typeof (Analytics.global) != "undefined" && Analytics.global != null
+				&& typeof (Analytics.global.cart) != "undefined" && Analytics.global.cart != null) {
+				var details = [];
+				var temprows = [];
+				if (typeof (Analytics.global.cart.lines) != "undefined" && Analytics.global.cart.lines != null) {
+					details = Analytics.global.cart.lines;
+				}
+
+				var tempcontent = getElementsByClassNameManual("table cartTable", document);
+				if (tempcontent != null && tempcontent.length > 0) {
+					temprows = tempcontent[0].tBodies[0].rows;
+				}
+
+				for (var i = 0; i < details.length; i++) {
+					var detail = details[i];
+					var temprow = temprows[i + 1];
+
+					var names = getElementsByClassNameManual("prodDesc", temprow);
+
+					var item_name = names[0].innerText || names[0].textContent;
+					var img_link = temprow.getElementsByTagName("img")[0].getAttribute("src");
+
+					var qty = detail.qty;
+					var price = detail.total / qty;
+					totalprice = totalprice + detail.total;
+					var item_sku = detail.sku;
+
+					data.push({
+						"action": "addItem",
+						"orderId": orderID,
+						"name": myTrim(item_name),
+						"price": price,
+						"sku": myTrim(item_sku),
+						"img": img_link,
+						"qty": qty
+					});
+
+				}
+
+				if (data.length > 0) {
+					var tempdata = {};
+
+					try {
+						if (typeof (Analytics.global.cart.Total) != "undefined" && Analytics.global.cart.Total != null
+							&& Analytics.global.cart.Total > 0) {
+							totalprice = Analytics.global.cart.Total;
+						}
+
+						if (typeof (Analytics.global.cart.ShippingTotal) != "undefined" && Analytics.global.cart.ShippingTotal != null
+							&& Analytics.global.cart.ShippingTotal > 0) {
+							tempdata.shipping = Analytics.global.cart.ShippingTotal;
+						}
+
+						if (typeof (Analytics.global.cart.Tax) != "undefined" && Analytics.global.cart.Tax != null && Analytics.global.cart.Tax > 0) {
+							tempdata.tax = Analytics.global.cart.Tax;
+						}
+
+						if (typeof (Analytics.global.cart.total) != "undefined" && Analytics.global.cart.total != null
+							&& Analytics.global.cart.total > 0) {
+							totalprice = Analytics.global.cart.total;
+						}
+
+						if (typeof (Analytics.global.cart.shippingTotal) != "undefined" && Analytics.global.cart.shippingTotal != null
+							&& Analytics.global.cart.shippingTotal > 0) {
+							tempdata.shipping = Analytics.global.cart.shippingTotal;
+						}
+
+						if (typeof (Analytics.global.cart.tax) != "undefined" && Analytics.global.cart.tax != null && Analytics.global.cart.tax > 0) {
+							tempdata.tax = Analytics.global.cart.tax;
+						}
+
+					}
+					catch (totalex) {
+					}
+
+					data.push({
+						"action": "trackOrder",
+						"orderId": orderID,
+						"orderTotal": totalprice,
+						"data": tempdata
+					});
+				}
+
+				return data;
+			}
+
+			return null;
+		}
+		catch (ex) {
+			log("getOrderData error. ", ex);
+
+			return null;
+		}
+	}
+
+	function getOrderDataCart() {
+		try {
+			var data = [];
+
+			var totalprice = 0;
+			var orderID = "auto";
+
+			if (typeof (Analytics) != "undefined" && Analytics != null && typeof (Analytics.global) != "undefined" && Analytics.global != null
+				&& typeof (Analytics.global.cart) != "undefined" && Analytics.global.cart != null) {
+				var temprows = [];
+
+				var tempcontent = document.getElementById("cartdiv");
+				if (tempcontent != null) {
+					temprows = getElementsByClassNameManual("dvCartLineItem", tempcontent);
+				}
+
+				for (var i = 0; i < temprows.length; i++) {
+					var temprow = temprows[i];
+
+					var names = getElementsByClassNameManual("desc scTrack pfm", temprow);
+					var qtys = getElementsByClassNameManual("qtyCart", temprow);
+					var skus = getElementsByClassNameManual("hideCartItemDiv", temprow);
+					var prices = getElementsByClassNameManual("itemSubTotal", temprow);
+
+					var item_name = names[0].innerText || names[0].textContent;
+					var img_link = temprow.getElementsByTagName("img")[0].src;
+
+					var qty = qtys[0].value;
+					var price = prices[0].innerText || prices[0].textContent;
+					price = parseFloat(price.replace(/[^0-9\.\-\+]/g, ""));
+					var sku = skus[0].getAttribute("data-sku");
+
+					totalprice = totalprice + price;
+					price = price / qty;
+
+					data.push({
+						"action": "addItem",
+						"orderId": orderID,
+						"name": myTrim(item_name),
+						"price": price,
+						"sku": sku,
+						"img": img_link,
+						"qty": qty
+					});
+
+				}
+
+				if (data.length > 0) {
+					var tempdata = {};
+
+					try {
+						if (typeof (Analytics.global.cart.Total) != "undefined" && Analytics.global.cart.Total != null
+							&& Analytics.global.cart.Total > 0) {
+							totalprice = Analytics.global.cart.Total;
+						}
+
+						if (typeof (Analytics.global.cart.ShippingTotal) != "undefined" && Analytics.global.cart.ShippingTotal != null
+							&& Analytics.global.cart.ShippingTotal > 0) {
+							tempdata.shipping = Analytics.global.cart.ShippingTotal;
+						}
+
+						if (typeof (Analytics.global.cart.Tax) != "undefined" && Analytics.global.cart.Tax != null && Analytics.global.cart.Tax > 0) {
+							tempdata.tax = Analytics.global.cart.Tax;
+						}
+
+						if (typeof (Analytics.global.cart.total) != "undefined" && Analytics.global.cart.total != null
+							&& Analytics.global.cart.total > 0) {
+							totalprice = Analytics.global.cart.total;
+						}
+
+						if (typeof (Analytics.global.cart.shippingTotal) != "undefined" && Analytics.global.cart.shippingTotal != null
+							&& Analytics.global.cart.shippingTotal > 0) {
+							tempdata.shipping = Analytics.global.cart.shippingTotal;
+						}
+
+						if (typeof (Analytics.global.cart.tax) != "undefined" && Analytics.global.cart.tax != null && Analytics.global.cart.tax > 0) {
+							tempdata.tax = Analytics.global.cart.tax;
+						}
+
+						try {
+							var tempcontent = document.getElementById("TotalWithTax");
+							if (tempcontent != null) {
+								var temptext = tempcontent.innerText || tempcontent.textContent;
+								totalprice = parseFloat(temptext.replace(/[^0-9\.\-\+]/g, ""));
+							}
+						}
+						catch (tempex) {
+						}
+
+						try {
+							var tempcontent = document.getElementById("stickyCartTotal");
+							if (tempcontent != null) {
+								tempcontent = getElementsByClassNameManual("SubTotal", tempcontent);
+								if (tempcontent != null && tempcontent.length > 0) {
+									tempcontent = getElementsByClassNameManual("PretaxSubTotal", tempcontent[0]);
+									if (tempcontent != null && tempcontent.length > 0) {
+										tempcontent = getElementsByClassNameManual("price", tempcontent[0]);
+										if (tempcontent != null && tempcontent.length > 0) {
+											var temptext = tempcontent[0].innerText || tempcontent[0].textContent;
+											totalprice = parseFloat(temptext.replace(/[^0-9\.\-\+]/g, ""));
+										}
+									}
+								}
+							}
+						}
+						catch (tempex) {
+						}
+
+					}
+					catch (totalex) {
+					}
+
+					data.push({
+						"action": "trackOrder",
+						"orderId": orderID,
+						"orderTotal": totalprice,
+						"data": tempdata
+					});
+				}
+
+				return data;
+			}
+
+			return null;
+		}
+		catch (ex) {
+			log("getOrderDataCart error. ", ex);
+
+			return null;
+		}
+	}
+
+	function getOrderDataCheckout() {
+		try {
+			var data = [];
+
+			var totalprice = 0;
+			var orderID = "auto";
+
+			if (typeof (Analytics) != "undefined" && Analytics != null && typeof (Analytics.global) != "undefined" && Analytics.global != null
+				&& typeof (Analytics.global.cart) != "undefined" && Analytics.global.cart != null) {
+				var temprows = [];
+				var details = [];
+
+				if (typeof (Analytics.global.cart.lines) != "undefined" && Analytics.global.cart.lines != null) {
+					details = Analytics.global.cart.lines;
+				}
+
+				var tempcontent = document.getElementById("checkoutCartInner");
+				if (tempcontent != null) {
+					temprows = getElementsByClassNameManual("cartgroup", tempcontent);
+				}
+
+				for (var i = 0; i < temprows.length; i++) {
+					var temprow = temprows[i];
+
+					var names = getElementsByClassNameManual("sku-desc", temprow);
+					var skus = getElementsByClassNameManual("scTrack", temprow);
+					var prices = getElementsByClassNameManual("price", temprow);
+
+					var item_name = names[0].innerText || names[0].textContent;
+					var img_link = temprow.getElementsByTagName("img")[0].getAttribute("src");
+
+					var price = prices[0].innerText || prices[0].textContent;
+					price = parseFloat(price.replace(/[^0-9\.\-\+]/g, ""));
+					var sku = skus[0].getAttribute("sku");
+					var qty = 1;
+					for (var l = 0; l < details.length; l++) {
+						var tempsku = details[l].sku;
+						if (tempsku == sku) {
+							qty = details[l].qty;
+							break;
+						}
+					}
+
+					totalprice = totalprice + price;
+					price = price / qty;
+
+					data.push({
+						"action": "addItem",
+						"orderId": orderID,
+						"name": myTrim(item_name),
+						"price": price,
+						"sku": myTrim(sku),
+						"img": img_link,
+						"qty": qty
+					});
+
+				}
+
+				if (data.length > 0) {
+					var tempdata = {};
+
+					try {
+						if (typeof (Analytics.global.cart.Total) != "undefined" && Analytics.global.cart.Total != null
+							&& Analytics.global.cart.Total > 0) {
+							totalprice = Analytics.global.cart.Total;
+						}
+
+						if (typeof (Analytics.global.cart.ShippingTotal) != "undefined" && Analytics.global.cart.ShippingTotal != null
+							&& Analytics.global.cart.ShippingTotal > 0) {
+							tempdata.shipping = Analytics.global.cart.ShippingTotal;
+						}
+
+						if (typeof (Analytics.global.cart.Tax) != "undefined" && Analytics.global.cart.Tax != null && Analytics.global.cart.Tax > 0) {
+							tempdata.tax = Analytics.global.cart.Tax;
+						}
+
+						if (typeof (Analytics.global.cart.total) != "undefined" && Analytics.global.cart.total != null
+							&& Analytics.global.cart.total > 0) {
+							totalprice = Analytics.global.cart.total;
+						}
+
+						if (typeof (Analytics.global.cart.shippingTotal) != "undefined" && Analytics.global.cart.shippingTotal != null
+							&& Analytics.global.cart.shippingTotal > 0) {
+							tempdata.shipping = Analytics.global.cart.shippingTotal;
+						}
+
+						if (typeof (Analytics.global.cart.tax) != "undefined" && Analytics.global.cart.tax != null && Analytics.global.cart.tax > 0) {
+							tempdata.tax = Analytics.global.cart.tax;
+						}
+
+						try {
+							var tempcontent = document.getElementById("TotalLabel");
+							if (tempcontent != null) {
+								var temptext = tempcontent.innerText || tempcontent.textContent;
+								totalprice = parseFloat(temptext.replace(/[^0-9\.\-\+]/g, ""));
+							}
+						}
+						catch (tempex) {
+						}
+					}
+					catch (totalex) {
+					}
+
+					data.push({
+						"action": "trackOrder",
+						"orderId": orderID,
+						"orderTotal": totalprice,
+						"data": tempdata
+					});
+				}
+
+				return data;
+			}
+
+			return null;
+		}
+		catch (ex) {
+			log("getOrderDataCheckout error. ", ex);
+
+			return null;
+		}
+	}
+
+	function orderConfirmProcess() {
+		try {
+			var data = [];
+			var detail = null;
+			var totalprice = null;
+			var orderID = null;
+			var tempdata = {};
+
+			detail = Analytics.tracking.orderconfirm;
+			totalprice = detail.orderrevenue;
+			orderID = detail.purchaseid;
+
+			try {
+				tempdata.shippingTotal = detail.deliveryFeeNotax;
+				tempdata.taxTotal = detail.tax;
+			}
+			catch (tempex) {
+			}
+
+			if (detail != null && orderID != null) {
+				if (typeof (orderID) != "undefined" && orderID != null && orderID.length > 0 && orderID != "auto") {
+					data.push({
+						"action": "trackOrder",
+						"orderId": "auto",
+						"newOrderId": orderID,
+						"orderTotal": totalprice,
+						"data": tempdata,
+						"update": true,
+						"complete": true
+					});
+				}
+
+				return data;
+			}
+
+			return null;
+		}
+		catch (ex) {
+			log("orderConfirmProcess error. ", ex);
+
+			return null;
+		}
+	}
+
+	function getVisitorId() {
+		try {
+			if (Analytics.global.visitor.vis_status == "LoggedIn") {
+				if (typeof (Analytics.global.visitor.individual_id) != "undefined" && Analytics.global.visitor.individual_id != null) {
+					return Analytics.global.visitor.individual_id;
+				}
+
+				// if (typeof (Analytics.global.visitor.email) != "undefined" && Analytics.global.visitor.email != null
+				// 	&& Analytics.global.visitor.email.length > 1) {
+				// 	return Analytics.global.visitor.email;
+				// }
+			}
+		}
+		catch (visitidex) {
+		}
+
+		return null;
+	}
+
+	function getVisitorName() {
+		try {
+			// if (Analytics.global.visitor.vis_status == "LoggedIn")
+			// {
+			// if (typeof (Analytics.global.visitor.cFirstN) != "undefined" &&
+			// Analytics.global.visitor.cFirstN != null
+			// && Analytics.global.visitor.cFirstN.length > 0)
+			// {
+			// return Analytics.global.visitor.cFirstN + " " +
+			// Analytics.global.visitor.cLastN;
+			// }
+			// }
+		}
+		catch (visitidex) {
+		}
+
+		return null;
+	}
+
+	function getVisitorData() {
+		var tempdata = {};
+		var tempencryption = {};
+		tempencryption.properties = [];
+
+		try {
+			if (typeof (Analytics) != "undefined" && Analytics != null && typeof (Analytics.global) != "undefined" && Analytics.global != null
+				&& typeof (Analytics.global.visitor) != "undefined" && Analytics.global.visitor != null) {
+				var tempobj = Analytics.global.visitor;
+
+				if (typeof (tempobj.zipcode) != "undefined" && tempobj.zipcode != null && tempobj.zipcode.length > 0) {
+					tempdata["zipcode"] = tempobj.zipcode;
+					tempencryption.properties.push("zipcode");
+				}
+				if (typeof (tempobj.account_num) != "undefined" && tempobj.account_num != null && tempobj.account_num.length > 0) {
+					tempdata["account_num"] = tempobj.account_num;
+					tempencryption.properties.push("account_num");
+				}
+				if (typeof (tempobj.cFirstN) != "undefined" && tempobj.cFirstN != null && tempobj.cFirstN.length > 0) {
+					tempdata["custFirstName"] = tempobj.cFirstN;
+					tempencryption.properties.push("custFirstName");
+				}
+				if (typeof (tempobj.cLastN) != "undefined" && tempobj.cLastN != null && tempobj.cLastN.length > 0) {
+					tempdata["custLastName"] = tempobj.cLastN;
+					tempencryption.properties.push("custLastName");
+				}
+				if (typeof (tempobj.companyName) != "undefined" && tempobj.companyName != null && tempobj.companyName.length > 0) {
+					tempdata["companyName"] = tempobj.companyName;
+					tempencryption.properties.push("companyName");
+				}
+				if (typeof (tempobj.email) != "undefined" && tempobj.email != null && tempobj.email.length > 0) {
+					tempdata["custEmail"] = tempobj.email;
+					tempencryption.properties.push("custEmail");
+
+					if (typeof (tempobj.repId) != "undefined" && tempobj.repId != null && tempobj.repId.length > 0 && typeof (tempobj.repN) != "undefined" && tempobj.repN != null && tempobj.repN.length > 0) {
+						tempdata["repId"] = tempobj.repId;
+						tempdata["repName"] = tempobj.repN;
+						tempdata["repCust"] = "1";
+					}
+					else { tempdata["repCust"] = "0"; }
+				}
+				if (typeof (tempobj.phone) != "undefined" && tempobj.phone != null && tempobj.phone.length > 0) {
+					tempdata["custPhone"] = tempobj.phone;
+					tempencryption.properties.push("custPhone");
+				}
+				if (typeof (tempobj.custrec) != "undefined" && tempobj.custrec != null && isNumber(tempobj.custrec)) {
+					tempdata["custrec"] = parseFloat(tempobj.custrec);
+				}
+				if (typeof (tempobj["account_type"]) != "undefined" && tempobj["account_type"] != null && tempobj["account_type"]) {
+					tempdata["account_type"] = tempobj["account_type"];
+				}
+				if (typeof (tempobj["rewardsplus"]) != "undefined" && tempobj["rewardsplus"] != null && tempobj["rewardsplus"]) {
+					tempdata["rewardsplus"] = tempobj["rewardsplus"];
+				}
+
+				try {
+					for (var key in tempobj) {
+						if (key != "repN" && key != "email" && key != "cLastN" && key != "cFirstN" && key != "phone") {
+							if (tempobj.hasOwnProperty(key)) {
+								if (tempobj[key] != null) {
+									if (!tempdata.hasOwnProperty(key)) {
+										if (typeof tempobj[key] === 'string' || tempobj[key] instanceof String) {
+											if (tempobj[key].length > 0) {
+												tempdata[key] = tempobj[key];
+											}
+										}
+										else if (isNumber(tempobj[key])) {
+											tempdata[key] = tempobj[key];
+										}
+									}
+								}
+							}
+						}
+					}
+				} catch (visitex) { }
+			}
+		}
+		catch (temptex) {
+		}
+
+		if (tempencryption.properties != null && tempencryption.properties.length > 0) {
+			tempdata.encryption = tempencryption;
+		}
+
+		return tempdata;
+	}
+
+	function insertInsideTag() {
+		try {
+			if (_inside && _inside.length > 0) {
+				for (var v = 0; v < _inside.length; v++) {
+					if (_inside[v].action == "trackView") {
+						if (_inside[v].name.length > 149) {
+							_inside[v].name = _inside[v].name.substring(0, 149);
+						}
+					}
+				}
+			}
+		} catch (trimex) { }
+
+		if (typeof (_insideGraph) != "undefined" && _insideGraph != null) {
+			_insideGraph.processQueue();
+		}
+		else {
+			var inside = document.createElement('script');
+			inside.type = 'text/javascript';
+			inside.async = true;
+			inside.src = ('https:' == document.location.protocol ? 'https://' : 'http://') + trackerURL + '/ig.js';
+			var s = document.getElementsByTagName('script')[0];
+			s.parentNode.insertBefore(inside, s);
+		}
+	}
+
+	function sendToInside() {
+		try {
+			var visitorId = getVisitorId();
+			var visitorName = getVisitorName();
+			var tempdata = getVisitorData();
+
+			if (typeof (_insideGraph) == "undefined" || _insideGraph == null) {
+				if (visitorId != null && visitorId.length > 0 && visitorName != null && visitorName.length > 0) {
+					_inside.push({
+						"action": "getTracker",
+						"crossDomain": false,
+						"subsiteId": subsiteId,
+						"account": accountKey,
+						"visitorData": tempdata,
+						"visitorId": visitorId,
+						"visitorName": visitorName
+					});
+				}
+				else if (visitorId != null && visitorId.length > 0) {
+					_inside.push({
+						"action": "getTracker",
+						"crossDomain": false,
+						"subsiteId": subsiteId,
+						"account": accountKey,
+						"visitorData": tempdata,
+						"visitorId": visitorId
+					});
+				}
+				else if (visitorName != null && visitorName.length > 0) {
+					_inside.push({
+						"action": "getTracker",
+						"crossDomain": false,
+						"subsiteId": subsiteId,
+						"account": accountKey,
+						"visitorData": tempdata,
+						"visitorName": visitorName
+					});
+				}
+				else {
+					_inside.push({
+						"action": "getTracker",
+						"crossDomain": false,
+						"subsiteId": subsiteId,
+						"account": accountKey,
+						"visitorData": tempdata
+					});
+				}
+			}
+
+			var view = getViewData();
+			if (view != null) {
+				if (view.type == "orderconfirmed") {
+					var tempconfirm = orderConfirmProcess();
+					if (tempconfirm != null && tempconfirm.length > 0) {
+						for (var i = 0; i < tempconfirm.length; i++) {
+							_inside.push(tempconfirm[i]);
+						}
+					}
+
+					_inside.push(view);
+				}
+				else {
+					_inside.push(view);
+
+					var orderData = getOrderData();
+					// if (useCustomFunctionForCheckout && view.type == "checkout") {
+					// 	orderData = getOrderDataCart();
+					// 	if (orderData == null || orderData.length == 0)
+					// 		orderData = getOrderDataCheckout();
+					// }
+
+					if (orderData != null && orderData.length > 0) {
+						for (var i = 0; i < orderData.length; i++) {
+							_inside.push(orderData[i]);
+							if (orderData[i].action == "trackOrder") {
+								view.orderId = orderData[i].orderId;
+								view.orderTotal = orderData[i].orderTotal;
+								insideOrderTotal = orderData[i].orderTotal;
+							}
+						}
+					}
+					else {
+						if (typeof (Analytics) != "undefined" && Analytics != null && typeof (Analytics.global) != "undefined"
+							&& Analytics.global != null && typeof (Analytics.global.cart) != "undefined" && Analytics.global.cart != null
+							&& typeof (Analytics.global.cart.total) != "undefined" && Analytics.global.cart.total != null
+							&& Analytics.global.cart.total > 0 && typeof (Analytics.global.cart.subtotal) != "undefined" && Analytics.global.cart.subtotal != null
+							&& Analytics.global.cart.subtotal > 0) {
+							view.orderId = "auto";
+							view.orderTotal = Analytics.global.cart.total;
+						}
+					}
+				}
+
+				log("Inside Debug: ", _inside);
+			}
+		}
+		catch (sendex) {
+			_inside = [];
+
+			_inside.push({
+				"action": "getTracker",
+				"crossDomain": false,
+				"subsiteId": subsiteId,
+				"account": accountKey
+			});
+
+			_inside.push({
+				"action": "trackView",
+				"type": "other",
+				"name": "Check: " + window.location.href
+			});
+
+			log(sendex);
+		}
+
+		insertInsideTag();
+
+		if (!firstCall)
+			firstCall = true;
+	}
+
+	var tempview = getViewData();
+	if (tempview != null && typeof (tempview.type) != "undefined" && tempview.type != null && tempview.type == "orderconfirmed") {
+		deferWait(sendToInside, function () {
+			var tempconfirm = orderConfirmProcess();
+			if (tempconfirm != null && tempconfirm.length > 0) {
+				return true;
+			}
+			return document.readyState != 'loading' && document.readyState != 'interactive';
+		});
+	}
+	else {
+		deferWait(sendToInside, function () {
+			if (document.readyState != 'loading' && document.readyState != 'interactive') {
+				tempview = getViewData();
+				if (tempview != null && typeof (tempview.type) != "undefined" && tempview.type != null) {
+					keepWait(sendToInside, function () {
+						if (!firstCall)
+							return false;
+
+						if (typeof (_insideGraph) != "undefined" && _insideGraph != null) {
+							var temporderdata = getOrderData();
+							// if (useCustomFunctionForCheckout && tempview.type == "checkout") {
+							// 	temporderdata = getOrderDataCart();
+							// 	if (temporderdata == null || temporderdata.length == 0)
+							// 		temporderdata = getOrderDataCheckout();
+							// }
+
+							if (temporderdata != null && temporderdata.length > 0) {
+								for (var i = 0; i < temporderdata.length; i++) {
+									if (temporderdata[i].action == "trackOrder") {
+										if (insideOrderTotal != temporderdata[i].orderTotal) {
+											return true;
+										}
+									}
+								}
+							}
+							else if (insideOrderTotal > 0) {
+								insideOrderTotal = 0;
+								return true;
+							}
+						}
+
+						return false;
+					});
+				}
+
+				return true;
+			}
+
+			return false;
+		});
+	}
+
+	deferWait(function () {
+		var websiteId = insideFrontInterface.chat.userid.split(':')[1];
+		_insideGraph.loadJS(_insideCDN + 'custom/' + websiteId + '-customScript.js?v=' + _insideScriptVersion);
+	}, function () {
+		return typeof _insideGraph != 'undefined' && _insideGraph.loadJS && typeof insideFrontInterface != 'undefined' && insideFrontInterface.chat && insideFrontInterface.chat.userid;
+	});
 })();
